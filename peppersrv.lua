@@ -16,6 +16,9 @@ require "xavante"
 require "xavante.filehandler"
 require "xavante.redirecthandler"
 
+-- Optional: zlib support
+local has_zlib = pcall(require, "zlib")
+
 
 -- Meta-data
 function describe()
@@ -106,11 +109,21 @@ function serve(req, res, self, report)
 		if not status then
 			return error_500(req, res, out)
 		end
+		local defout = ""
+		if has_zlib then
+			defout = zlib.deflate()(out, "finish")
+		end
 		date = repo:revision(head):date()
-		cache[report] = {head, date, out}
+		cache[report] = {head, date, out, defout}
 	else
 		date = cache[report][2]
 		out = cache[report][3]
+	end
+
+	-- Serve deflated content if possible
+	if has_zlib and (req.headers["accept-encoding"] or ""):find("deflate") then
+		out = cache[report][4]
+		res.headers["Content-Encoding"] = "deflate"
 	end
 
 	res.headers["Content-Type"] = mime_types[imgtype]
