@@ -8,7 +8,6 @@
 --]]
 
 
-require "json"
 require "pepper.plotutils"
 require "xavante"
 
@@ -51,36 +50,6 @@ local mime_types = {
 	jpeg = "image/jpg",
 	gif = "image/gif"
 }
-
--- Wrapper for getopt()
-function getopt(self, opt, default)
-	for i,v in ipairs(pepper.utils.split(opt, ",")) do
-		if config[v] then
-			return config[v]
-		end
-	end
-	if default then
-		return self:getopt(opt, default)
-	else
-		return self:getopt(opt)
-	end
-end
-
--- Create HTTP errors of type 500 (server failure)
-function error_500(req, res, err)
-	res.statusline = "HTTP/1.1 500 Internal Server Error"
-	res.headers ["Content-Type"] = "text/html"
-	res.content = string.format([[
-	<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
-	<HTML><HEAD>
-	<TITLE>500 Internal Server Error</TITLE>
-	</HEAD><BODY>
-	<H1>Internal Server Error</H1>
-	<P>The server encountered an error while trying to server %s:</P>
-	<VERBATIM>%s</VERBATIM>
-	</BODY></HTML>]], req.built_url, err);
-	return res
-end
 
 -- Serves a report image
 function serve(req, res, self, report)
@@ -239,4 +208,151 @@ function main(self)
 		},
 	}
 	xavante.start()
+end
+
+
+--[[
+	Utility functions
+--]]
+
+-- Wrapper for getopt()
+function getopt(self, opt, default)
+	for i,v in ipairs(pepper.utils.split(opt, ",")) do
+		if config[v] then
+			return config[v]
+		end
+	end
+	if default then
+		return self:getopt(opt, default)
+	else
+		return self:getopt(opt)
+	end
+end
+
+-- Create HTTP errors of type 500 (server failure)
+function error_500(req, res, err)
+	res.statusline = "HTTP/1.1 500 Internal Server Error"
+	res.headers ["Content-Type"] = "text/html"
+	res.content = string.format([[
+	<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+	<HTML><HEAD>
+	<TITLE>500 Internal Server Error</TITLE>
+	</HEAD><BODY>
+	<H1>Internal Server Error</H1>
+	<P>The server encountered an error while trying to server %s:</P>
+	<VERBATIM>%s</VERBATIM>
+	</BODY></HTML>]], req.built_url, err);
+	return res
+end
+
+
+--[[
+	JSON encoding functions from:
+
+	JSON4Lua: JSON encoding / decoding support for the Lua language.
+	json Module.
+	Author: Craig Mason-Jones
+	Homepage: http://json.luaforge.net/
+	Version: 0.9.50
+	This module is released under the MIT License (MIT).
+--]]
+
+local base = _G
+
+--- Encodes an arbitrary Lua object / variable.
+-- @param v The Lua object / variable to be JSON encoded.
+-- @return String containing the JSON encoding in internal Lua string format (i.e. not unicode)
+function json_encode(v)
+	-- Handle nil values
+	if v==nil then
+		return "null"
+	end
+
+	local vtype = base.type(v)  
+
+	-- Handle strings
+	if vtype=='string' then    
+		return '"' .. encodeString(v) .. '"'	    -- Need to handle encoding in string
+	end
+
+	-- Handle booleans
+	if vtype=='number' or vtype=='boolean' then
+		return base.tostring(v)
+	end
+
+	-- Handle tables
+	if vtype=='table' then
+		local rval = {}
+		-- Consider arrays separately
+		local bArray, maxCount = isArray(v)
+		if bArray then
+			for i = 1,maxCount do
+				table.insert(rval, json_encode(v[i]))
+			end
+		else	-- An object, not an array
+			for i,j in base.pairs(v) do
+				if isEncodable(i) and isEncodable(j) then
+					table.insert(rval, '"' .. encodeString(i) .. '":' .. json_encode(j))
+				end
+			end
+		end
+		if bArray then
+			return '[' .. table.concat(rval,',') ..']'
+		else
+			return '{' .. table.concat(rval,',') .. '}'
+		end
+	end
+
+	-- Handle null values
+	if vtype=='function' and v==null then
+		return 'null'
+	end
+
+	base.assert(false,'encode attempt to encode unsupported type ' .. vtype .. ':' .. base.tostring(v))
+end
+
+--- Encodes a string to be JSON-compatible.
+-- This just involves back-quoting inverted commas, back-quotes and newlines, I think ;-)
+-- @param s The string to return as a JSON encoded (i.e. backquoted string)
+-- @return The string appropriately escaped.
+local qrep = {["\\"]="\\\\", ['"']='\\"',['\n']='\\n',['\t']='\\t'}
+function encodeString(s)
+	return tostring(s):gsub('["\\\n\t]',qrep)
+end
+
+--- Determines whether the given Lua object / table / variable can be JSON encoded. The only
+-- types that are JSON encodable are: string, boolean, number, nil, table and json.null.
+-- In this implementation, all other types are ignored.
+-- @param o The object to examine.
+-- @return boolean True if the object should be JSON encoded, false if it should be ignored.
+function isEncodable(o)
+	local t = base.type(o)
+	return (t=='string' or t=='boolean' or t=='number' or t=='nil' or t=='table') or (t=='function' and o==null) 
+end
+
+-- Determines whether the given Lua type is an array or a table / dictionary.
+-- We consider any table an array if it has indexes 1..n for its n items, and no
+-- other data in the table.
+-- I think this method is currently a little 'flaky', but can't think of a good way around it yet...
+-- @param t The table to evaluate as an array
+-- @return boolean, number True if the table can be represented as an array, false otherwise. If true,
+-- the second returned value is the maximum
+-- number of indexed elements in the array. 
+function isArray(t)
+	-- Next we count all the elements, ensuring that any non-indexed elements are not-encodable 
+	-- (with the possible exception of 'n')
+	local maxIndex = 0
+	for k,v in base.pairs(t) do
+		if (base.type(k)=='number' and math.floor(k)==k and 1<=k) then	-- k,v is an indexed pair
+			if (not isEncodable(v)) then return false end	-- All array elements must be encodable
+			maxIndex = math.max(maxIndex,k)
+		else
+			if (k=='n') then
+				if v ~= table.getn(t) then return false end  -- False if n does not hold the number of elements
+			else -- Else of (k=='n')
+				if isEncodable(v) then return false end
+			end  -- End of (k~='n')
+		end -- End of k,v not an indexed pair
+	end  -- End of loop across all pairs
+	return true, maxIndex
 end
