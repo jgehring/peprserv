@@ -23,9 +23,12 @@ function describe()
 	r.title = "peppersrv"
 	r.description = "Repository statistics server"
 	r.options = {
+		{"-cARG, --config=ARG", "Load configuration from file ARG"},
 		{"-rLIST, --reports=LIST", "Serve reports from comma-separated LIST"},
 		{"-tARG, --type=ARG", "Set image type"},
-		{"--show-index", "Show simple index page for debugging"}
+		{"--show-index", "Show simple index page for debugging"},
+		{"-hARG, --host=ARG", "Bind to host AGG (default 0.0.0.0)"},
+		{"-pARG, --port=ARG", "Bind to port ARG (default 8080)"},
 	}
 	return r
 end
@@ -33,6 +36,9 @@ end
 
 -- Cache: report => {head, output}
 local cache = {}
+
+-- Configuration loaded from file
+local config = {}
 
 -- Image extension to mime type
 local mime_types = {
@@ -43,11 +49,25 @@ local mime_types = {
 	gif = "image/gif"
 }
 
+-- Wrapper for getopt()
+function getopt(self, opt, default)
+	for i,v in ipairs(pepper.utils.split(opt, ",")) do
+		if config[v] then
+			return config[v]
+		end
+	end
+	if default then
+		return self:getopt(opt, default)
+	else
+		return self:getopt(opt)
+	end
+end
+
 -- Create HTTP errors of type 500 (server failure)
 function error_500(req, res, err)
 	res.statusline = "HTTP/1.1 500 Internal Server Error"
 	res.headers ["Content-Type"] = "text/html"
-	res.content = string.format ([[
+	res.content = string.format([[
 	<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
 	<HTML><HEAD>
 	<TITLE>500 Internal Server Error</TITLE>
@@ -65,15 +85,22 @@ function serve(req, res, self, report)
 		return xavante.httpd.err_405(req, res)
 	end
 
+	-- Setup report options
 	local options = {}
-	local imgtype = string.lower(self:getopt("t,type", "svg"))
+	local imgtype = string.lower(getopt(self, "t,type", "svg"))
 	options["type"] = imgtype
+	if config.reports and config.reports[report] then
+		for k,v in pairs(config.reports[report]) do
+			options[k] = tostring(v)
+		end
+	end
 
 	local repo = self:repository()
 	local head = repo:head()
 	local date
 	local status, out
 
+	-- Run report if not cached yet
 	if cache[report] == nil or cache[report][1] ~= head then
 		status, out = pcall(pepper.run, report, options)
 		if not status then
@@ -90,6 +117,7 @@ function serve(req, res, self, report)
 	res.headers["Last-Modified"] = os.date("!%a, %d %b %Y %H:%M:%S GMT", date)
 
 	-- Answer to modification time quries
+	-- TODO: Answer _before_ running the report
 	local lms = req.headers["if-modified-since"] or 0
 	local lm = res.headers["Last-Modified"] or 1
 	if lms == lm then
@@ -102,6 +130,7 @@ function serve(req, res, self, report)
 	end
 
 	-- Serve file (or headers only)
+	-- TODO: gzip compression for SVG files
 	res.headers["Content-Length"] = #out
 	if req.cmd_mth == "GET" then
 		res.chunked = false
@@ -138,20 +167,38 @@ end
 
 -- Report entry point
 function main(self)
+	-- Read configuration file
+	local config_file = self:getopt("c,config")
+	if config_file then
+		config = require(config_file:gsub(".lua$", ""))
+	end
+
 	-- Check image type
-	local imgtype = string.lower(self:getopt("t,type", "svg"))
+	local imgtype = string.lower(getopt(self, "t,type", "svg"))
 	if mime_types[imgtype] == nil then
 		error("Unsupported image type: " .. imgtype)
 	end
 
+	-- Load report definitions
+	local reports = {}
+	if config and config.reports then
+		reports = config.reports
+	else
+		local list = getopt(self, "r,reports", table.concat(pepper.list_reports(), ","))
+		for i,v in ipairs(pepper.utils.split(list, ",")) do
+			reports[v] = {}
+		end
+	end
+
 	-- Setup URL patterns for reports
-	local reports = self:getopt("r,reports", table.concat(pepper.list_reports(), ","))
 	local rules = {}
 	local names = {}
-	for i,v in ipairs(pepper.utils.split(reports, ",")) do
-		local name = pepper.utils.basename(v):gsub(".lua", "")
-		table.insert(rules, {match = "^/r/" .. name .. "$", with = make_serve, params = {self = self, report = name}})
-		table.insert(names, name)
+	for k,v in pairs(reports) do
+		local name = pepper.utils.basename(k):gsub(".lua$", "")
+		local path = name
+		if v and v.path then path = v.path end
+		table.insert(rules, {match = "^/r/" .. name .. "$", with = make_serve, params = {self = self, report = path}})
+		table.insert(names, path)
 	end
 	table.sort(names)
 
@@ -161,7 +208,7 @@ function main(self)
 	})
 
 	-- Show index page for debugging
-	if self:getopt("show-index") then
+	if getopt(self, "show-index") then
 		table.insert(rules, {
 			match = "/index.html", with = xavante.filehandler, params = {baseDir = "/home/jonas/webdevel/peppersrv"}
 		})
@@ -172,7 +219,8 @@ function main(self)
 
 	-- Start HTTP server
 	xavante.HTTP{
-		server = {host = "*", port = 8080},
+		server = {host = getopt(self, "host", "0.0.0.0"),
+		port = tonumber(getopt(self, "p,port", "8080"))},
 		defaultHost = {
 			rules = rules
 		},
