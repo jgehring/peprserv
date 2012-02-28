@@ -124,26 +124,19 @@ function serve(req, res, self, report)
 	return res
 end
 
--- Constructs a new serve() callback with bound arguments
-function make_serve(args)
-	return function(req, res)
-		return serve(req, res, args.self, args.report)
-	end
-end
-
 -- Listing function
 function list(req, res, self, reports)
-	local c = json.encode(reports)
+	local c = json_encode(reports)
 	res.headers["Content-Type"] = "application/json"
 	res.headers["Content-Length"] = #c
 	res:send_data(c)
 	return res
 end
 
--- Constructs a listing callback with bound arguments
-function make_list(args)
+-- Binds a function for a Xavante rule
+function bind_function(args)
 	return function(req, res)
-		return list(req, res, args.self, args.reports)
+		return args[1](req, res, unpack(args, 2))
 	end
 end
 
@@ -179,23 +172,32 @@ function main(self)
 		local name = pepper.utils.basename(k):gsub(".lua$", "")
 		local path = name
 		if v and v.path then path = v.path end
-		table.insert(rules, {match = "^/r/" .. name .. "$", with = make_serve, params = {self = self, report = path}})
+		table.insert(rules, {
+			match = "^/r/" .. name .. "$",
+			with = bind_function,
+			params = {serve, self, path}})
 		table.insert(names, path)
 	end
 	table.sort(names)
 
 	-- Setup helper patters
 	table.insert(rules, {
-		match = "^/list$", with = make_list, params = {self = self, reports = names}
+		match = "^/list$",
+		with = bind_function,
+		params = {list, self, names}
 	})
 
 	-- Show index page for debugging
 	if getopt(self, "show-index") then
 		table.insert(rules, {
-			match = "/index.html", with = xavante.filehandler, params = {baseDir = "/home/jonas/webdevel/peppersrv"}
+			match = "/index.html",
+			with = xavante.filehandler,
+			params = {baseDir = "/home/jonas/webdevel/peppersrv"}
 		})
 		table.insert(rules, {
-			match = ".", with = xavante.redirecthandler, params = {"index.html"}
+			match = ".",
+			with = xavante.redirecthandler,
+			params = {"index.html"}
 		})
 	end
 
