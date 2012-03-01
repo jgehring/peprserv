@@ -13,6 +13,7 @@ require "xavante"
 
 -- Optional: zlib support
 local has_zlib = pcall(require, "zlib")
+local has_posix = pcall(require, "posix")
 
 
 -- Meta-data
@@ -70,6 +71,8 @@ function serve(req, res, self, report)
 
 	-- Run report if not cached yet
 	if cache[report] == nil or cache[report][1] ~= head then
+		local time = os.clock()
+
 		status, out = pcall(pepper.run, report, options)
 		if not status then
 			return error_500(req, res, out)
@@ -80,6 +83,8 @@ function serve(req, res, self, report)
 		end
 		date = repo:revision(head):date()
 		cache[report] = {head, date, out, defout}
+
+		log(string.format("ran report '%s' in %.2fs", report, os.clock() - time))
 	else
 		date = cache[report][2]
 		out = cache[report][3]
@@ -202,6 +207,9 @@ function main(self)
 	end
 
 	-- Start HTTP server
+	xavante.start_message(function (ports)
+		log("listening on port " .. table.concat(ports, ", "))
+	end)
 	xavante.HTTP{
 		server = {host = getopt(self, "host", "0.0.0.0"),
 		port = tonumber(getopt(self, "p,port", "8080"))},
@@ -216,6 +224,16 @@ end
 --[[
 	Utility functions
 --]]
+
+-- Logging function
+function log(msg)
+	local date = os.date('[%Y-%m-%d %H:%M:%S]')
+	if has_posix then
+		print(date .. " peppersrv [" .. posix.getpid("pid") .. "]: " .. msg)
+	else
+		print(date .. " peppersrv: " .. msg)
+	end
+end
 
 -- Wrapper for getopt()
 function getopt(self, opt, default)
