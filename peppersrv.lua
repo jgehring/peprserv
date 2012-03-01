@@ -11,10 +11,6 @@
 require "pepper.plotutils"
 require "xavante"
 
--- Needed for debugging
-require "xavante.filehandler"
-require "xavante.redirecthandler"
-
 -- Optional: zlib support
 local has_zlib = pcall(require, "zlib")
 
@@ -133,6 +129,15 @@ function list(req, res, self, reports)
 	return res
 end
 
+-- Index page
+function index(req, res)
+  res.headers["Content-Type"] = "text/html"
+  local s = index_page()
+  res.headers["Content-Length"] = #s
+	res:send_data(s)
+  return res
+end
+
 -- Binds a function for a Xavante rule
 function bind_function(args)
 	return function(req, res)
@@ -190,14 +195,9 @@ function main(self)
 	-- Show index page for debugging
 	if getopt(self, "show-index") then
 		table.insert(rules, {
-			match = "/index.html",
-			with = xavante.filehandler,
-			params = {baseDir = "/home/jonas/webdevel/peppersrv"}
-		})
-		table.insert(rules, {
 			match = ".",
-			with = xavante.redirecthandler,
-			params = {"index.html"}
+			with = bind_function,
+			params = {index}
 		})
 	end
 
@@ -236,15 +236,46 @@ function error_500(req, res, err)
 	res.statusline = "HTTP/1.1 500 Internal Server Error"
 	res.headers ["Content-Type"] = "text/html"
 	res.content = string.format([[
-	<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
-	<HTML><HEAD>
-	<TITLE>500 Internal Server Error</TITLE>
-	</HEAD><BODY>
-	<H1>Internal Server Error</H1>
-	<P>The server encountered an error while trying to server %s:</P>
-	<VERBATIM>%s</VERBATIM>
-	</BODY></HTML>]], req.built_url, err);
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>500 Internal Server Error</title>
+</head><body>
+<h1>Internal Server Error</h1>
+<p>The server encountered an error while trying to server %s:</p>
+<verbatim>%s</verbatim>
+</body></html>]], req.built_url, err);
 	return res
+end
+
+-- HTML code for the index page
+function index_page()
+  return [[
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>peppersrv</title>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
+<script>
+  $(function() {
+    $(document).ready(function() {
+      $.getJSON('list', function(data) {
+        var html = '';
+        var len = data.length;
+        for (var i = 0; i < len; i++) {
+          html += '<option value="' + data[i] + '">' + data[i] + '</option>';
+        }
+        $("#reports").append(html).change();
+      });
+    });
+    $("#reports").change(function() {
+      $("#out").empty().append("<img src=\"r/" + $(this).val() + "\">");
+    });
+  });
+</script>
+</head><body>
+<p>Select a report: <select id="reports"></select></p>
+<p id="out"></p>
+</body></html> 
+]]
 end
 
 
