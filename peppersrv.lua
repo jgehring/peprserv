@@ -92,12 +92,8 @@ function serve(req, res, self, report)
 		if not status then
 			return error_500(req, res, out)
 		end
-		local defout = ""
-		if has_zlib then
-			defout = zlib.deflate()(out, "finish")
-		end
 		date = repo:revision(head):date()
-		entry = {head = head, date = date, out = out, defout = defout}
+		entry = {head = head, date = date, out = out}
 		cache:put(key, entry)
 
 		log(string.format("ran report '%s' in %.2fs", report, os.clock() - time))
@@ -108,6 +104,9 @@ function serve(req, res, self, report)
 
 	-- Serve deflated content if possible
 	if has_zlib and (req.headers["accept-encoding"] or ""):find("deflate") then
+		if not entry.defout then
+			entry.defout = zlib.deflate()(out, "finish")
+		end
 		out = entry.defout
 		res.headers["Content-Encoding"] = "deflate"
 	end
