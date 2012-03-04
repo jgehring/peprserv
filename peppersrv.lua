@@ -64,6 +64,14 @@ function serve(req, res, self, report)
 		end
 	end
 
+	-- Add report options from URL
+	if req.parsed_url.query then
+		for i,v in ipairs(pepper.utils.split(req.parsed_url.query, "&")) do
+			local t = pepper.utils.split(v, "=")
+			options[t[1]] = t[2]
+		end
+	end
+
 	local repo = self:repository()
 	local head = repo:head()
 	local date
