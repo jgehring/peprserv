@@ -33,8 +33,9 @@ function describe()
 end
 
 
--- Cache: report => {head, output}
-local cache = {}
+-- Report output cache
+local cache = nil
+local cache_limit = 1000 -- default value
 
 -- Configuration loaded from file
 local config = {}
@@ -77,8 +78,14 @@ function serve(req, res, self, report)
 	local date
 	local status, out
 
+	local key = report
+	for k,v in pairs(options) do
+		key = key .. "&" .. k .. "=" .. v
+	end
+
 	-- Run report if not cached yet
-	if cache[report] == nil or cache[report][1] ~= head then
+	local entry = cache:get(key)
+	if entry == nil or entry.head ~= head then
 		local time = os.clock()
 
 		status, out = pcall(pepper.run, report, options)
@@ -90,17 +97,18 @@ function serve(req, res, self, report)
 			defout = zlib.deflate()(out, "finish")
 		end
 		date = repo:revision(head):date()
-		cache[report] = {head, date, out, defout}
+		entry = {head = head, date = date, out = out, defout = defout}
+		cache:put(key, entry)
 
 		log(string.format("ran report '%s' in %.2fs", report, os.clock() - time))
 	else
-		date = cache[report][2]
-		out = cache[report][3]
+		date = entry.data
+		out = entry.out
 	end
 
 	-- Serve deflated content if possible
 	if has_zlib and (req.headers["accept-encoding"] or ""):find("deflate") then
-		out = cache[report][4]
+		out = entry.defout
 		res.headers["Content-Encoding"] = "deflate"
 	end
 
@@ -171,6 +179,9 @@ function main(self)
 	if mime_types[imgtype] == nil then
 		error("Unsupported image type: " .. imgtype)
 	end
+
+	cache_limit = tonumber(getopt(self, "cache_limit", tostring(cache_limit)))
+	cache = Cache.create(cache_limit)
 
 	-- Load report definitions
 	local reports = {}
@@ -302,6 +313,51 @@ function index_page()
 <p id="out"></p>
 </body></html> 
 ]]
+end
+
+
+-- A small LRU cache
+Cache = {}
+Cache.__index = Cache
+
+function Cache.create(limit)
+	local c = {}
+	setmetatable(c, Cache)
+	c.limit = limit < 2 and 2 or limit
+	c.tail = {n = nil, p = nil, key = nil}
+	c.head = c.tail
+	c.v = {}
+	return c
+end
+
+function Cache:put(key, entry)
+	local ov = self.v[key]
+	local node = {n = self.head, p = nil, key = key}
+	self.head.p = node
+	self.head = node
+	self.v[key] = {entry, node}
+
+	if self.limit <= 0 then -- Removed least recently used key
+		node = self.tail.p
+		node.p.n, self.tail.p = self.tail, node.p
+		self.v[node.key] = nil
+	else
+		self.limit = self.limit - 1
+	end
+end
+
+function Cache:get(key)
+	local v = self.v[key]
+	if not v then return v end
+
+	local node = v[2] -- Move entry to head of list
+	if node ~= self.head then
+		node.p.n, node.n.p = node.n, node.p
+		self.head.p = node
+		node.n, node.p = self.head, nil
+		self.head = node
+	end
+	return v[1]
 end
 
 
