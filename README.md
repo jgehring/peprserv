@@ -1,7 +1,7 @@
-peppersrv - A repository statistics server for pepper
-=====================================================
+peprserv - A repository statistics server for pepper
+====================================================
 
-peppersrv is a small web server that provides statistics and graphs
+peprserv is a small web server that provides statistics and graphs
 for source code repositories. It is implemented as a report script for 
 [pepper](http://scm-pepper.sourceforge.net) and serves the output of
 other reports via HTTP.
@@ -23,7 +23,7 @@ Dependencies
 Setup
 -----
 The script handles a number of command-line arguments to customize
-its behavior. 
+its behaviour. 
 
 While you're setting up the server, you can use the `--show-index` flag
 to make the server provide a small HTML page that can be used to test
@@ -46,18 +46,16 @@ Individual report arguments can be append to an URL, like in `/r/loc?branch=next
 Arguments inside the URL take precedence over those specified in the
 configuration file.
 
-**Notes**
+**Performance Notes**
 
-peppersrv runs in a single thread inside a single process and will block
-while generating a report (but caches the results, of course). Data gathering
-and plotting on large repositories might be CPU-intense, so 
-
-
+peprserv caches report output, but needs to lookup the current head
+revision of the repository for every request. This might be time-consuming
+for remote Subversion repositories.
 
 
 License
 -------
-peppersrv - A repository statistics server for pepper
+peprserv - A repository statistics server for pepper
 Copyright (C) 2012 Jonas Gehring
 
 This program is free software: you can redistribute it and/or modify
