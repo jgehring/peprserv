@@ -1,5 +1,5 @@
 --[[
-	peppersrv - A repository statistics server for pepper
+	peprserv - A repository statistics server for pepper
 	Copyright (C) 2012 Jonas Gehring
 
 	Released under the GNU General Public License, version 3.
@@ -19,7 +19,7 @@ local has_posix = pcall(require, "posix")
 -- Meta-data
 function describe()
 	local r = {}
-	r.title = "peppersrv"
+	r.title = "peprserv"
 	r.description = "Repository statistics server"
 	r.options = {
 		{"-cARG, --config=ARG", "Load configuration from file ARG"},
@@ -247,9 +247,9 @@ end
 function log(msg)
 	local date = os.date('[%Y-%m-%d %H:%M:%S]')
 	if has_posix then
-		print(date .. " peppersrv [" .. posix.getpid("pid") .. "]: " .. msg)
+		print(date .. " peprserv [" .. posix.getpid("pid") .. "]: " .. msg)
 	else
-		print(date .. " peppersrv: " .. msg)
+		print(date .. " peprserv: " .. msg)
 	end
 end
 
@@ -288,7 +288,7 @@ function index_page()
   return [[
 <!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
 <html><head>
-<title>peppersrv</title>
+<title>peprserv</title>
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1/jquery.min.js"></script>
 <script>
   $(function() {
