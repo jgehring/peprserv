@@ -143,6 +143,14 @@ end
 -- Listing function
 function list(req, res, self, reports)
 	local c = json_encode(reports)
+	if req.parsed_url.query then
+		-- JSONP support
+		local callback = req.parsed_url.query:match("callback=([^&]*)")
+		if callback then
+			c = callback .."(" .. c .. ")"
+		end
+	end
+
 	res.headers["Content-Type"] = "application/json"
 	res.headers["Content-Length"] = #c
 	res:send_data(c)
