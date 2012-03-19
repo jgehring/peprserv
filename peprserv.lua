@@ -166,9 +166,9 @@ function list(req, res, self, reports)
 end
 
 -- Index page
-function index(req, res)
+function index(req, res, self)
   res.headers["Content-Type"] = "text/html"
-  local s = index_page()
+  local s = index_page(self:repository():url())
   res.headers["Content-Length"] = #s
 	res:send_data(s)
   return res
@@ -236,7 +236,7 @@ function main(self)
 		table.insert(rules, {
 			match = ".",
 			with = bind_function,
-			params = {index}
+			params = {index, self}
 		})
 	end
 
@@ -300,8 +300,8 @@ function error_500(req, res, err)
 end
 
 -- HTML code for the index page
-function index_page()
-  return [[
+function index_page(repo_url)
+  return string.format([[
 <!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
 <html><head>
 <title>peprserv</title>
@@ -324,10 +324,10 @@ function index_page()
   });
 </script>
 </head><body>
+<h2>Runnning on %s</h2>
 <p>Select a report: <select id="reports"></select></p>
 <p id="out"></p>
-</body></html> 
-]]
+</body></html>]], repo_url)
 end
 
 
