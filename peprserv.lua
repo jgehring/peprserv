@@ -70,6 +70,7 @@ function serve(req, res, self, report)
 			if not k:match("^_") then options[k] = tostring(v) end
 		end
 	end
+	res.headers["Content-Type"] = mime_types[options["type"]]
 
 	-- Add report options from URL
 	if req.parsed_url.query then
@@ -93,20 +94,6 @@ function serve(req, res, self, report)
 		cached_head = repo:head()
 		cached_head_time = os.time()
 		cached_head_date = repo:revision(cached_head):date()
-	end
-
-	-- Answer to modification time quries
-	res.headers["Content-Type"] = mime_types[options["type"]]
-	res.headers["Last-Modified"] = os.date("!%a, %d %b %Y %H:%M:%S GMT", cached_head_date)
-	local lms = req.headers["if-modified-since"] or 0
-	local lm = res.headers["Last-Modified"] or 1
-	if lms == lm then
-		res.headers["Content-Length"] = 0
-		res.statusline = "HTTP/1.1 304 Not Modified"
-		res.content = ""
-		res.chunked = false
-		res:send_headers()
-		return res
 	end
 
 	local status, out
@@ -134,6 +121,19 @@ function serve(req, res, self, report)
 		end
 		out = entry.defout
 		res.headers["Content-Encoding"] = "deflate"
+	end
+
+	-- Answer to modification time quries
+	res.headers["Last-Modified"] = os.date("!%a, %d %b %Y %H:%M:%S GMT", entry.t)
+	local lms = req.headers["if-modified-since"] or 0
+	local lm = res.headers["Last-Modified"] or 1
+	if lms == lm then
+		res.headers["Content-Length"] = 0
+		res.statusline = "HTTP/1.1 304 Not Modified"
+		res.content = ""
+		res.chunked = false
+		res:send_headers()
+		return res
 	end
 
 	-- Serve file (or headers only)
