@@ -183,6 +183,8 @@ end
 
 -- Report entry point
 function main(self)
+	log("connected to " .. self:repository():url())
+
 	-- Read configuration file
 	local config_file = self:getopt("c,config")
 	if config_file then
