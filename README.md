@@ -14,7 +14,7 @@ is available at [http://jgehring.net:9000](http://jgehring.net:9000).
 
 Dependencies
 ------------
--   [pepper](http://scm-pepper.sourceforge.net)
+-   [pepper](http://scm-pepper.sourceforge.net), version 0.3.1 or higher
 -   [Xavante](http://keplerproject.github.com/xavante/)
 -   optional: [lua-zlib](https://github.com/brimworks/lua-zlib) for output
     compression 
