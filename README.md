@@ -31,10 +31,12 @@ point your browser to `http://localhost:8080`and check your console for
 possible progress output.
 
 
-Setup
------
-The script handles a number of command-line arguments to customize
-its behaviour. 
+Configuration
+-------------
+The script handles a number of command-line arguments to customize its
+behaviour, but for full control you might want to use a configuration
+file. The example configuration included in the package (`config.lua`)
+should provide a good starting point.
 
 While you're setting up the server, you can use the `--show-index` flag
 to make the server provide a small HTML page that can be used to test
@@ -45,17 +47,18 @@ Usage
 -----
 The program is a web server using HTTP, so you need a browser or something
 similar to get data from it. Example given, if a report named `loc` is
-offered, it is available at `/r/loc`. However, the intended use case is
-acting as a backend for web sites, providing dynamic repository statistics
-on demand. Thus, the program offers a small API containing the following
+offered, it is available at `/r/loc`. However, the intended use case
+is acting as a backend for web sites, providing on-demand repository
+statistics.  Thus, the program offers a small API containing the following
 "functions" (i.e. URLs):
 
--   `/list` returns a JSON-formatted list with all offered report scripts
--   `/r/$REPORT` runs the report named `$REPORT` and returns its output
+-   `/list` returns a JSON-formatted list with all offered report
+     scripts. JSONP via `?callback=` is supported, too.
+-   `/r/$REPORT` runs the respective report and returns its output
 
-Individual report arguments can be append to an URL, like in `/r/loc?branch=next`.
-Arguments inside the URL take precedence over those specified in the
-configuration file.
+Individual report arguments can be append to an URL, like in
+`/r/loc?branch=next`.  Arguments inside the URL take precedence over
+those specified in the configuration file.
 
 
 License
