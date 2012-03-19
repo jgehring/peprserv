@@ -41,6 +41,7 @@ local cache_limit = 1000 -- default value
 -- Cached repository head
 local cached_head = nil
 local cached_head_time = 0
+local cached_head_date = 0
 
 -- Configuration loaded from file
 local config = {}
@@ -66,7 +67,7 @@ function serve(req, res, self, report)
 	options["type"] = imgtype
 	if config.reports and config.reports[report] then
 		for k,v in pairs(config.reports[report]) do
-			options[k] = tostring(v)
+			if not k:match("^_") then options[k] = tostring(v) end
 		end
 	end
 
@@ -91,27 +92,38 @@ function serve(req, res, self, report)
 	if cached_head == nil or os.difftime(os.time(), cached_head_time) > interval then
 		cached_head = repo:head()
 		cached_head_time = os.time()
-		print("fetching head: " .. cached_head)
+		cached_head_date = repo:revision(cached_head):date()
 	end
 
-	local date
+	-- Answer to modification time quries
+	res.headers["Content-Type"] = mime_types[options["type"]]
+	res.headers["Last-Modified"] = os.date("!%a, %d %b %Y %H:%M:%S GMT", cached_head_date)
+	local lms = req.headers["if-modified-since"] or 0
+	local lm = res.headers["Last-Modified"] or 1
+	if lms == lm then
+		res.headers["Content-Length"] = 0
+		res.statusline = "HTTP/1.1 304 Not Modified"
+		res.content = ""
+		res.chunked = false
+		res:send_headers()
+		return res
+	end
+
 	local status, out
 
 	-- Run report if not cached yet
 	if entry == nil or entry.head ~= cached_head then
 		local time = os.clock()
 
-		status, out = pcall(pepper.run, report, options)
+		status, out = pcall(pepper.run, config.reports[report]._path, options)
 		if not status then
 			return error_500(req, res, out)
 		end
-		date = repo:revision(cached_head):date()
-		entry = {head = head, date = date, out = out, t = os.time()}
+		entry = {head = head, out = out, t = os.time()}
 		cache:put(key, entry)
 
 		log(string.format("ran report '%s' in %.2fs", report, os.clock() - time))
 	else
-		date = entry.data
 		out = entry.out
 	end
 
@@ -122,22 +134,6 @@ function serve(req, res, self, report)
 		end
 		out = entry.defout
 		res.headers["Content-Encoding"] = "deflate"
-	end
-
-	res.headers["Content-Type"] = mime_types[imgtype]
-	res.headers["Last-Modified"] = os.date("!%a, %d %b %Y %H:%M:%S GMT", date)
-
-	-- Answer to modification time quries
-	-- TODO: Answer _before_ running the report
-	local lms = req.headers["if-modified-since"] or 0
-	local lm = res.headers["Last-Modified"] or 1
-	if lms == lm then
-		res.headers["Content-Length"] = 0
-		res.statusline = "HTTP/1.1 304 Not Modified"
-		res.content = ""
-		res.chunked = false
-		res:send_headers()
-		return res
 	end
 
 	-- Serve file (or headers only)
@@ -217,14 +213,14 @@ function main(self)
 	local rules = {}
 	local names = {}
 	for k,v in pairs(reports) do
-		local name = pepper.utils.basename(k):gsub(".lua$", "")
-		local path = name
-		if v and v.path then path = v.path end
+		if not v._path then
+			v._path = pepper.utils.basename(k):gsub(".lua$", "")
+		end
 		table.insert(rules, {
-			match = "^/r/" .. name .. "$",
+			match = "^/r/" .. k .. "$",
 			with = bind_function,
-			params = {serve, self, path}})
-		table.insert(names, path)
+			params = {serve, self, k}})
+		table.insert(names, k)
 	end
 	table.sort(names)
 
