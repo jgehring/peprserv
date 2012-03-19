@@ -20,6 +20,17 @@ Dependencies
     compression 
 
 
+Quick-start
+-----------
+Install the dependencies, cd to the top-level peprserv directory and run
+
+	$ pepper peprserv --config=config.lua --show-index $REPOSITORY
+
+where $REPOSITORY is the path a source code repository. Afterwards,
+point your browser to `http://localhost:8080`and check your console for
+possible progress output.
+
+
 Setup
 -----
 The script handles a number of command-line arguments to customize
@@ -40,17 +51,11 @@ on demand. Thus, the program offers a small API containing the following
 "functions" (i.e. URLs):
 
 -   `/list` returns a JSON-formatted list with all offered report scripts
--   `/r/$report` runs the report named `$report` and returns its output
+-   `/r/$REPORT` runs the report named `$REPORT` and returns its output
 
 Individual report arguments can be append to an URL, like in `/r/loc?branch=next`.
 Arguments inside the URL take precedence over those specified in the
 configuration file.
-
-**Performance Notes**
-
-peprserv caches report output, but needs to lookup the current head
-revision of the repository for every request. This might be time-consuming
-for remote Subversion repositories.
 
 
 License
