@@ -324,7 +324,7 @@ function index_page(repo_url)
   });
 </script>
 </head><body>
-<h2>Runnning on %s</h2>
+<h2>Running on %s</h2>
 <p>Select a report: <select id="reports"></select></p>
 <p id="out"></p>
 </body></html>]], repo_url)
