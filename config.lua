@@ -9,6 +9,7 @@ local options = {
 port = 8080,         -- Default port is 8080
 host = "0.0.0.0",    -- Accept connections from everywhere
 type = "svg",        -- Generate SVG images by default
+check-head = 60,     -- Check for new repository head after 60 seconds
 
 -- Report definitions with report-specific options
 reports = {

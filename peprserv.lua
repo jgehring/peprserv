@@ -28,6 +28,7 @@ function describe()
 		{"--show-index", "Show simple index page for debugging"},
 		{"-hARG, --host=ARG", "Bind to host AGG (default 0.0.0.0)"},
 		{"-pARG, --port=ARG", "Bind to port ARG (default 8080)"},
+		{"--check-head=ARG", "Interval for repository head check in seconds (default 60)"},
 	}
 	return r
 end
@@ -36,6 +37,10 @@ end
 -- Report output cache
 local cache = nil
 local cache_limit = 1000 -- default value
+
+-- Cached repository head
+local cached_head = nil
+local cached_head_time = 0
 
 -- Configuration loaded from file
 local config = {}
@@ -73,27 +78,35 @@ function serve(req, res, self, report)
 		end
 	end
 
-	local repo = self:repository()
-	local head = repo:head()
-	local date
-	local status, out
-
+	-- Query cache
 	local key = report
 	for k,v in pairs(options) do
 		key = key .. "&" .. k .. "=" .. v
 	end
+	local entry = cache:get(key)
+
+	-- Check repository head
+	local repo = self:repository()
+	local interval = tonumber(getopt(self, "check-head", 60))
+	if cached_head == nil or os.difftime(os.time(), cached_head_time) > interval then
+		cached_head = repo:head()
+		cached_head_time = os.time()
+		print("fetching head: " .. cached_head)
+	end
+
+	local date
+	local status, out
 
 	-- Run report if not cached yet
-	local entry = cache:get(key)
-	if entry == nil or entry.head ~= head then
+	if entry == nil or entry.head ~= cached_head then
 		local time = os.clock()
 
 		status, out = pcall(pepper.run, report, options)
 		if not status then
 			return error_500(req, res, out)
 		end
-		date = repo:revision(head):date()
-		entry = {head = head, date = date, out = out}
+		date = repo:revision(cached_head):date()
+		entry = {head = head, date = date, out = out, t = os.time()}
 		cache:put(key, entry)
 
 		log(string.format("ran report '%s' in %.2fs", report, os.clock() - time))
@@ -128,7 +141,6 @@ function serve(req, res, self, report)
 	end
 
 	-- Serve file (or headers only)
-	-- TODO: gzip compression for SVG files
 	res.headers["Content-Length"] = #out
 	if req.cmd_mth == "GET" then
 		res.chunked = false
