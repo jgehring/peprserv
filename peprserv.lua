@@ -119,10 +119,10 @@ function serve(req, res, self, report)
 		if not status then
 			return error_500(req, res, out)
 		end
-		entry = {head = head, out = out, t = os.time()}
+		entry = {head = cached_head, out = out, t = os.time()}
 		cache:put(key, entry)
 
-		log(string.format("ran report '%s' in %.2fs", report, os.clock() - time))
+		log(string.format("ran report %s (%s) in %.2fs", report, config.reports[report]._path, os.clock() - time))
 	else
 		out = entry.out
 	end
