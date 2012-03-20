@@ -26,17 +26,17 @@ Install the dependencies, cd to the top-level peprserv directory and run
 
 	$ pepper peprserv --config=config.lua --show-index $REPOSITORY
 
-where $REPOSITORY is the path a source code repository. Afterwards,
+where `$REPOSITORY` is the path a source code repository. Afterwards,
 point your browser to `http://localhost:8080`and check your console for
 possible progress output.
 
 
 Configuration
 -------------
-The script handles a number of command-line arguments to customize its
-behaviour, but for full control you might want to use a configuration
-file. The example configuration included in the package (`config.lua`)
-should provide a good starting point.
+The script can be customized with various command-line arguments,
+accessible by passing `--help`. For full control, you might want to use
+a configuration file. The example configuration included in the package
+(`config.lua`) should provide a good starting point.
 
 While you're setting up the server, you can use the `--show-index` flag
 to make the server provide a small HTML page that can be used to test
