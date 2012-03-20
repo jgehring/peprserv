@@ -8,7 +8,7 @@ other reports via HTTP.
 
 Current features include individual report configuration, caching of
 report output and answering to HTTP HEAD requests. A live demo using
-[Linus' Linux tree](http://git.kernel.org/?p=linux/kernel/git/torvalds/linux.git)
+[the official Git repository](https://github.com/gitster/git)
 is available at [http://jgehring.net:9000](http://jgehring.net:9000).
 
 
