@@ -1,5 +1,5 @@
 --[[
-	Example configuration file for peprsrv
+	Example configuration file for peprserv
 --]]
 
 
